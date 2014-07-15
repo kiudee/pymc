@@ -144,7 +144,14 @@ class Model(Context, Factor):
             var = FreeRV(name=name, distribution=dist, model=self)
             self.free_RVs.append(var)
         else:
-            var = ObservedRV(name=name, data=data, distribution=dist, model=self)
+            mask = None
+            if hasattr(data, 'mask'):
+                mask = data.mask
+                var = FreeRV(name=name, distribution=dist, model=self, 
+                    mask=np.logical_not(mask))
+                self.free_RVs.append(var)
+
+            var = ObservedRV(name=name, data=data, distribution=dist, model=self, mask=mask)
             self.observed_RVs.append(var)
         self.add_random_variable(var)
         return var
@@ -299,7 +306,7 @@ compilef = fastfn
 
 class FreeRV(Factor, TensorVariable):
     """Unobserved random variable that a model is specified in terms of."""
-    def __init__(self, type=None, owner=None, index=None, name=None, distribution=None, model=None):
+    def __init__(self, type=None, owner=None, index=None, name=None, distribution=None, mask=None, model=None):
         """
         Parameters
         ----------
@@ -309,6 +316,7 @@ class FreeRV(Factor, TensorVariable):
 
         name : str
         distribution : Distribution
+        mask : array
         model : Model"""
         if type is None:
             type = distribution.type
@@ -318,6 +326,7 @@ class FreeRV(Factor, TensorVariable):
             self.dshape = tuple(distribution.shape)
             self.dsize = int(np.prod(distribution.shape))
             self.distribution = distribution
+            self.mask = mask
             self.tag.test_value = np.ones(
                 distribution.shape, distribution.dtype) * distribution.default()
             self.logp_elemwiset = distribution.logp(self)
@@ -325,7 +334,7 @@ class FreeRV(Factor, TensorVariable):
 
 class ObservedRV(Factor):
     """Observed random variable that a model is specified in terms of."""
-    def __init__(self, name, data, distribution, model):
+    def __init__(self, name, data, distribution, model, mask=None):
         """
         Parameters
         ----------
@@ -336,6 +345,7 @@ class ObservedRV(Factor):
         name : str
         distribution : Distribution
         model : Model
+        mask : array
         """
         self.name = name
         data = getattr(data, 'values', data) #handle pandas
@@ -350,6 +360,7 @@ class ObservedRV(Factor):
 
         self.logp_elemwiset = distribution.logp(*args)
         self.model = model
+        self.mask = None
 
 def Deterministic(name, var, model=None):
     """Create a named deterministic variable

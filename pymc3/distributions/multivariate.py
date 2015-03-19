@@ -6,7 +6,7 @@ from theano.tensor.nlinalg import det, matrix_inverse, trace
 from theano.tensor import dot, cast, eye, diag, eq, le, ge, all
 from theano.printing import Print
 
-__all__ = ['MvNormal', 'Dirichlet', 'Multinomial', 'Wishart', 'LKJCorr']
+__all__ = ['MvNormal', 'Dirichlet', 'Multinomial', 'Wishart', 'LKJCorr', 'MvT']
 
 class MvNormal(Continuous):
     """
@@ -37,6 +37,44 @@ class MvNormal(Continuous):
         result = k * log(2*pi) + log(1./det(tau))
         result += (delta.dot(tau) * delta).sum(axis=delta.ndim - 1)
         return -1/2. * result
+
+
+class MvT(Continuous):
+    """
+    Multivariate T distribution
+
+    :Parameters:
+        mu : vector of means
+        cov : precision matrix
+
+    .. math::
+        f(x \mid \pi, T) = \frac{|T|^{1/2}}{(2\pi)^{1/2}} \exp\left\{ -\frac{1}{2} (x-\mu)^{\prime}T(x-\mu) \right\}
+
+    :Support:
+        2 array of floats
+    """
+    def __init__(self, mu, tau, nu, *args, **kwargs):
+        super(MvT, self).__init__(*args, **kwargs)
+        self.mean = self.median = self.mode = self.mu = mu
+        self.tau = tau
+        self.nu = nu
+
+    def logp(self, value):
+        mu = self.mu
+        tau = self.tau
+        nu = self.nu
+
+        delta = value - mu
+        k = tau.shape[0]
+
+        result = gammaln((nu + k) / 2.)
+        result -= gammaln(nu / 2.)
+        result -= 0.5 * k * log(nu)
+        result -= 0.5 * k * log(pi)
+        result -= 0.5 * log(1./det(tau))
+        result -= (0.5 * (nu+k) * log(1. + 1./nu * 
+            (delta.dot(tau) * delta).sum(axis=delta.ndim - 1)))
+        return result
 
 
 class Dirichlet(Continuous):
